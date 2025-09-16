@@ -1,4 +1,4 @@
-import { showToast, getDeviceFingerprint, formatFileSize, formatDate, checkAuth, handleApiError } from './utils.js';
+import { showToast, getDeviceFingerprint, formatFileSize, formatDate, checkAuth, handleApiError, apiFetch } from './utils.js';
 
 // Global state
 let currentPath = [];
@@ -129,32 +129,28 @@ function setupEventListeners() {
     document.getElementById('confirm-delete').addEventListener('click', deleteItem);
 }
 
-// Load file manager data
+// Load file manager data using the improved apiFetch
 async function loadFileManagerData() {
     try {
         const deviceFingerprint = getDeviceFingerprint();
         
-        const response = await fetch('/api/jsonbin', {
+        const { success, data, error } = await apiFetch('/api/jsonbin', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': 'read'
-            },
             body: JSON.stringify({
                 action: 'getStorage',
                 deviceFingerprint
-            })
+            }),
+            csrfToken: 'read'
         });
         
-        if (response.ok) {
-            const data = await response.json();
+        if (success) {
             currentFiles = data.files || [];
             currentFolders = data.folders || [];
             updateBreadcrumb();
             renderFileList();
             renderFolderTree();
         } else {
-            showToast('Failed to load storage data', 'error');
+            showToast(error || 'Failed to load storage data', 'error');
         }
     } catch (error) {
         handleApiError(error, 'Failed to load data');
