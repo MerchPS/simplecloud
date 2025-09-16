@@ -1,15 +1,16 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-// In a real implementation, you would use a database
+// In a real implementation, you would use a proper database
 // For demo purposes, we'll use a simple in-memory store
 const users = new Map();
+const rateLimitMap = new Map();
 
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Protection');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Handle preflight request
@@ -26,14 +27,14 @@ export default async function handler(req, res) {
     const { action, storageId, password, deviceFingerprint } = req.body;
 
     // Verify CSRF protection header
-    const csrfHeader = req.headers['x-csrf-protection'];
+    const csrfHeader = req.headers['x-csrf-token'];
     if (!csrfHeader || !['create', 'login', 'verify'].includes(csrfHeader)) {
-      return res.status(401).json({ error: 'Invalid request' });
+      return res.status(401).json({ error: 'Invalid CSRF token' });
     }
 
     // Apply rate limiting based on IP and device fingerprint
     const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    if (await isRateLimited(clientIP, deviceFingerprint)) {
+    if (isRateLimited(clientIP, deviceFingerprint)) {
       return res.status(429).json({ error: 'Too many requests. Please try again later.' });
     }
 
@@ -52,25 +53,34 @@ export default async function handler(req, res) {
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      // Create user storage
+      // Create user storage with sample data
       users.set(storageId, {
         password: hashedPassword,
         createdAt: new Date().toISOString(),
         storage: {
           files: [],
-          folders: []
+          folders: [
+            {
+              id: 'root',
+              name: 'Home',
+              path: '/',
+              children: []
+            }
+          ]
         }
       });
 
       // Generate JWT token
       const token = jwt.sign(
-        { storageId }, 
-        process.env.JWT_SECRET, 
-        { expiresIn: '7d' }
+        { 
+          storageId,
+          exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 days
+        }, 
+        process.env.JWT_SECRET || 'fallback-secret-for-development'
       );
 
       // Set token in HTTP-only cookie
-      res.setHeader('Set-Cookie', `token=${token}; HttpOnly; Path=/; SameSite=Strict; Max-Age=604800`);
+      res.setHeader('Set-Cookie', `token=${token}; HttpOnly; Path=/; SameSite=Strict; Max-Age=604800${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`);
 
       return res.status(200).json({ message: 'Storage created successfully' });
     }
@@ -95,13 +105,15 @@ export default async function handler(req, res) {
 
       // Generate JWT token
       const token = jwt.sign(
-        { storageId }, 
-        process.env.JWT_SECRET, 
-        { expiresIn: '7d' }
+        { 
+          storageId,
+          exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 days
+        }, 
+        process.env.JWT_SECRET || 'fallback-secret-for-development'
       );
 
       // Set token in HTTP-only cookie
-      res.setHeader('Set-Cookie', `token=${token}; HttpOnly; Path=/; SameSite=Strict; Max-Age=604800`);
+      res.setHeader('Set-Cookie', `token=${token}; HttpOnly; Path=/; SameSite=Strict; Max-Age=604800${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`);
 
       return res.status(200).json({ message: 'Login successful' });
     }
@@ -114,7 +126,7 @@ export default async function handler(req, res) {
       }
 
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-for-development');
         
         // Check if storage still exists
         if (!users.has(decoded.storageId)) {
@@ -135,8 +147,7 @@ export default async function handler(req, res) {
 }
 
 // Simple rate limiting implementation
-const rateLimitMap = new Map();
-async function isRateLimited(ip, deviceFingerprint) {
+function isRateLimited(ip, deviceFingerprint) {
   const key = `${ip}:${JSON.stringify(deviceFingerprint)}`;
   const now = Date.now();
   const windowStart = now - 3600000; // 1 hour window
