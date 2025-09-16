@@ -3,7 +3,14 @@
 // Show toast notification
 export function showToast(message, type = 'info') {
     const toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) return;
+    if (!toastContainer) {
+        // Create toast container if it doesn't exist
+        const container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'fixed top-4 right-4 z-50 space-y-2';
+        document.body.appendChild(container);
+        return showToast(message, type); // Retry
+    }
     
     const toast = document.createElement('div');
     toast.className = `toast ${type} px-4 py-3 rounded-lg shadow-lg flex items-center justify-between max-w-md`;
@@ -19,7 +26,11 @@ export function showToast(message, type = 'info') {
     `;
     
     toastContainer.appendChild(toast);
-    lucide.createIcons();
+    
+    // Initialize icons if Lucide is available
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
     
     // Auto remove after 5 seconds
     setTimeout(() => {
@@ -27,9 +38,12 @@ export function showToast(message, type = 'info') {
     }, 5000);
     
     // Allow manual dismiss
-    toast.querySelector('button').addEventListener('click', () => {
-        toast.remove();
-    });
+    const button = toast.querySelector('button');
+    if (button) {
+        button.addEventListener('click', () => {
+            toast.remove();
+        });
+    }
 }
 
 function getToastIcon(type) {
@@ -61,7 +75,7 @@ export function getDeviceFingerprint() {
 
 // Format file size
 export function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
+    if (!bytes || bytes === 0) return '0 Bytes';
     
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -72,8 +86,14 @@ export function formatFileSize(bytes) {
 
 // Format date
 export function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (!dateString) return 'Unknown';
+    
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+        return 'Invalid date';
+    }
 }
 
 // Generate a simple CSRF token
@@ -81,8 +101,15 @@ export function generateCSRFToken() {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
-// Check if user is logged in
+// Check if user is logged in (demo version)
 export async function checkAuth() {
+    // For demo purposes, check localStorage
+    const currentUser = localStorage.getItem('cloudstorage_current_user');
+    if (currentUser) {
+        return true;
+    }
+    
+    // Try to check with real API
     try {
         const response = await fetch('/api/auth', {
             method: 'POST',
@@ -122,6 +149,8 @@ export function handleApiError(error, defaultMessage = 'An error occurred') {
         setTimeout(() => {
             window.location.href = '/';
         }, 2000);
+    } else if (error.message && error.message.includes('404')) {
+        showToast('Server temporarily unavailable. Using demo mode.', 'warning');
     } else {
         showToast(defaultMessage, 'error');
     }
@@ -148,7 +177,7 @@ export async function apiFetch(url, options = {}) {
         } else {
             // If not JSON, get the text response
             const text = await response.text();
-            throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}...`);
+            throw new Error(`Server returned non-JSON response: ${response.status} ${response.statusText}`);
         }
         
         if (!response.ok) {
@@ -160,4 +189,37 @@ export async function apiFetch(url, options = {}) {
         console.error('API fetch error:', error);
         return { success: false, error: error.message };
     }
+}
+
+// Demo mode data functions
+export function getDemoStorage() {
+    const currentUser = localStorage.getItem('cloudstorage_current_user');
+    if (!currentUser) return null;
+    
+    const users = JSON.parse(localStorage.getItem('cloudstorage_users') || '{}');
+    return users[currentUser] ? users[currentUser].storage : {
+        files: [],
+        folders: [
+            {
+                id: 'root',
+                name: 'Home',
+                path: '/',
+                children: []
+            }
+        ]
+    };
+}
+
+export function saveDemoStorage(storageData) {
+    const currentUser = localStorage.getItem('cloudstorage_current_user');
+    if (!currentUser) return false;
+    
+    const users = JSON.parse(localStorage.getItem('cloudstorage_users') || '{}');
+    if (users[currentUser]) {
+        users[currentUser].storage = storageData;
+        localStorage.setItem('cloudstorage_users', JSON.stringify(users));
+        return true;
+    }
+    
+    return false;
 }
