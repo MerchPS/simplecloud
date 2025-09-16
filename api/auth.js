@@ -1,9 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-// In a real implementation, you would use a proper database
-// For demo purposes, we'll use a simple in-memory store
-const users = new Map();
+// In-memory store untuk rate limiting
 const rateLimitMap = new Map();
 
 export default async function handler(req, res) {
@@ -44,8 +42,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Storage ID and password are required' });
       }
 
-      // Check if storage already exists
-      if (users.has(storageId)) {
+      // Check if storage already exists in JSONBin
+      const existingUser = await getStorageFromJSONBin(storageId);
+      if (existingUser) {
         return res.status(409).json({ error: 'Storage ID already exists' });
       }
 
@@ -53,8 +52,8 @@ export default async function handler(req, res) {
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      // Create user storage with sample data
-      users.set(storageId, {
+      // Create user storage data
+      const userData = {
         password: hashedPassword,
         createdAt: new Date().toISOString(),
         storage: {
@@ -68,7 +67,13 @@ export default async function handler(req, res) {
             }
           ]
         }
-      });
+      };
+
+      // Save to JSONBin
+      const saveSuccess = await saveStorageToJSONBin(storageId, userData);
+      if (!saveSuccess) {
+        return res.status(500).json({ error: 'Failed to create storage' });
+      }
 
       // Generate JWT token
       const token = jwt.sign(
@@ -91,14 +96,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Storage ID and password are required' });
       }
 
-      // Check if storage exists
-      const user = users.get(storageId);
-      if (!user) {
+      // Check if storage exists in JSONBin
+      const userData = await getStorageFromJSONBin(storageId);
+      if (!userData) {
         return res.status(401).json({ error: 'Invalid storage ID or password' });
       }
 
       // Verify password
-      const passwordMatch = await bcrypt.compare(password, user.password);
+      const passwordMatch = await bcrypt.compare(password, userData.password);
       if (!passwordMatch) {
         return res.status(401).json({ error: 'Invalid storage ID or password' });
       }
@@ -128,8 +133,9 @@ export default async function handler(req, res) {
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-for-development');
         
-        // Check if storage still exists
-        if (!users.has(decoded.storageId)) {
+        // Check if storage still exists in JSONBin
+        const userData = await getStorageFromJSONBin(decoded.storageId);
+        if (!userData) {
           return res.status(401).json({ error: 'Storage not found' });
         }
 
@@ -143,6 +149,68 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Auth API error:', error);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+// Function to get storage data from JSONBin
+async function getStorageFromJSONBin(storageId) {
+  try {
+    const response = await fetch(`https://api.jsonbin.io/v3/b/${storageId}`, {
+      method: 'GET',
+      headers: {
+        'X-Master-Key': process.env.JSONBIN_KEY,
+        'X-Bin-Meta': false
+      }
+    });
+
+    if (response.status === 404) {
+      return null; // Storage not found
+    }
+
+    if (!response.ok) {
+      throw new Error(`JSONBin error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting storage from JSONBin:', error);
+    return null;
+  }
+}
+
+// Function to save storage data to JSONBin
+async function saveStorageToJSONBin(storageId, data) {
+  try {
+    // First try to create a new bin
+    const createResponse = await fetch('https://api.jsonbin.io/v3/b', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': process.env.JSONBIN_KEY,
+        'X-Bin-Name': storageId,
+        'X-Bin-Private': true
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (createResponse.ok) {
+      return true;
+    }
+
+    // If create fails (maybe bin already exists), try to update
+    const updateResponse = await fetch(`https://api.jsonbin.io/v3/b/${storageId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': process.env.JSONBIN_KEY
+      },
+      body: JSON.stringify(data)
+    });
+
+    return updateResponse.ok;
+  } catch (error) {
+    console.error('Error saving storage to JSONBin:', error);
+    return false;
   }
 }
 
