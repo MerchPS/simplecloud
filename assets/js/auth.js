@@ -1,4 +1,4 @@
-import { showToast, getDeviceFingerprint } from './utils.js';
+import { showToast, getDeviceFingerprint, generateCSRFToken, handleApiError } from './utils.js';
 
 // Initialize Lucide icons
 document.addEventListener('DOMContentLoaded', () => {
@@ -70,7 +70,7 @@ async function handleCreateStorage() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-Protection': 'create'
+                'X-CSRF-Token': 'create'
             },
             body: JSON.stringify({
                 action: 'create',
@@ -90,8 +90,7 @@ async function handleCreateStorage() {
             showToast(data.error || 'Failed to create storage', 'error');
         }
     } catch (error) {
-        console.error('Create storage error:', error);
-        showToast('Network error. Please try again.', 'error');
+        handleApiError(error, 'Failed to create storage');
     }
 }
 
@@ -115,7 +114,7 @@ async function handleLoginAfterCreate(storageId, password) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-Protection': 'login'
+                'X-CSRF-Token': 'login'
             },
             body: JSON.stringify({
                 action: 'login',
@@ -137,7 +136,6 @@ async function handleLoginAfterCreate(storageId, password) {
             showToast(data.error || 'Login failed', 'error');
         }
     } catch (error) {
-        console.error('Login error:', error);
-        showToast('Network error. Please try again.', 'error');
+        handleApiError(error, 'Login failed');
     }
 }
