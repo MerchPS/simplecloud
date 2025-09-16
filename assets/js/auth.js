@@ -80,7 +80,17 @@ async function handleCreateStorage() {
             })
         });
         
-        const data = await response.json();
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        let data;
+        
+        if (contentType && contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            // If not JSON, get the text response
+            const text = await response.text();
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
         
         if (response.ok) {
             showToast('Storage created successfully!', 'success');
@@ -124,7 +134,17 @@ async function handleLoginAfterCreate(storageId, password) {
             })
         });
         
-        const data = await response.json();
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        let data;
+        
+        if (contentType && contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            // If not JSON, get the text response
+            const text = await response.text();
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
         
         if (response.ok) {
             showToast('Login successful!', 'success');
