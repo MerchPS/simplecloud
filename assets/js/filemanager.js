@@ -1,4 +1,4 @@
-import { showToast, getDeviceFingerprint, formatFileSize, formatDate } from './utils.js';
+import { showToast, getDeviceFingerprint, formatFileSize, formatDate, checkAuth, handleApiError } from './utils.js';
 
 // Global state
 let currentPath = [];
@@ -60,27 +60,6 @@ function initTheme() {
     });
 }
 
-// Check authentication
-async function checkAuth() {
-    try {
-        const response = await fetch('/api/auth', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Protection': 'verify'
-            },
-            body: JSON.stringify({
-                action: 'verify'
-            })
-        });
-        
-        return response.ok;
-    } catch (error) {
-        console.error('Auth check error:', error);
-        return false;
-    }
-}
-
 // Set up all event listeners
 function setupEventListeners() {
     // Sidebar toggle for mobile
@@ -107,20 +86,22 @@ function setupEventListeners() {
     
     // Drag and drop
     const uploadArea = document.getElementById('upload-area');
-    uploadArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadArea.classList.add('drag-over');
-    });
-    
-    uploadArea.addEventListener('dragleave', () => {
-        uploadArea.classList.remove('drag-over');
-    });
-    
-    uploadArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        uploadArea.classList.remove('drag-over');
-        handleDroppedFiles(e.dataTransfer.files);
-    });
+    if (uploadArea) {
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            handleDroppedFiles(e.dataTransfer.files);
+        });
+    }
     
     // Create folder modal
     document.getElementById('create-folder-btn').addEventListener('click', () => {
@@ -151,14 +132,17 @@ function setupEventListeners() {
 // Load file manager data
 async function loadFileManagerData() {
     try {
+        const deviceFingerprint = getDeviceFingerprint();
+        
         const response = await fetch('/api/jsonbin', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-Protection': 'read'
+                'X-CSRF-Token': 'read'
             },
             body: JSON.stringify({
-                action: 'getStorage'
+                action: 'getStorage',
+                deviceFingerprint
             })
         });
         
@@ -173,8 +157,7 @@ async function loadFileManagerData() {
             showToast('Failed to load storage data', 'error');
         }
     } catch (error) {
-        console.error('Load data error:', error);
-        showToast('Network error. Please try again.', 'error');
+        handleApiError(error, 'Failed to load data');
     }
 }
 
@@ -182,6 +165,8 @@ async function loadFileManagerData() {
 function renderFileList() {
     const fileList = document.getElementById('file-list');
     const emptyState = document.getElementById('empty-state');
+    
+    if (!fileList || !emptyState) return;
     
     // Clear current list
     fileList.innerHTML = '';
@@ -214,9 +199,12 @@ function renderFileList() {
         fileList.appendChild(row);
         
         // Add click event to navigate into folder
-        row.querySelector('.flex.items-center').addEventListener('click', () => {
-            navigateToFolder(folder.id, folder.name);
-        });
+        const folderElement = row.querySelector('.flex.items-center');
+        if (folderElement) {
+            folderElement.addEventListener('click', () => {
+                navigateToFolder(folder.id, folder.name);
+            });
+        }
     });
     
     // Then render files
@@ -226,10 +214,10 @@ function renderFileList() {
         
         // Get file icon based on type
         let fileIcon = 'file';
-        if (file.type.includes('image')) fileIcon = 'image';
-        else if (file.type.includes('pdf')) fileIcon = 'file-text';
-        else if (file.type.includes('zip')) fileIcon = 'archive';
-        else if (file.type.includes('text')) fileIcon = 'file-text';
+        if (file.type && file.type.includes('image')) fileIcon = 'image';
+        else if (file.type && file.type.includes('pdf')) fileIcon = 'file-text';
+        else if (file.type && file.type.includes('zip')) fileIcon = 'archive';
+        else if (file.type && file.type.includes('text')) fileIcon = 'file-text';
         
         row.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap">
@@ -249,10 +237,13 @@ function renderFileList() {
         fileList.appendChild(row);
         
         // Add download event
-        row.querySelector('.download-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            downloadFile(file.id);
-        });
+        const downloadBtn = row.querySelector('.download-btn');
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                downloadFile(file.id);
+            });
+        }
     });
     
     // Add event listeners to action buttons
@@ -281,6 +272,8 @@ function renderFileList() {
 // Render folder tree
 function renderFolderTree() {
     const folderTree = document.getElementById('folder-tree');
+    if (!folderTree) return;
+    
     // This would be implemented to show the full folder hierarchy
     // For simplicity, we're just showing a basic implementation
     folderTree.innerHTML = `
@@ -291,14 +284,19 @@ function renderFolderTree() {
     `;
     
     // Add click event to navigate home
-    folderTree.querySelector('.folder-item').addEventListener('click', () => {
-        navigateToFolder('root', 'Home');
-    });
+    const homeElement = folderTree.querySelector('.folder-item');
+    if (homeElement) {
+        homeElement.addEventListener('click', () => {
+            navigateToFolder('root', 'Home');
+        });
+    }
 }
 
 // Update breadcrumb
 function updateBreadcrumb() {
     const breadcrumb = document.getElementById('breadcrumb');
+    if (!breadcrumb) return;
+    
     breadcrumb.innerHTML = '';
     
     // Always show Home as the first item
@@ -331,8 +329,11 @@ function updateBreadcrumb() {
     }
     
     // Update current folder title
-    document.getElementById('current-folder').textContent = 
-        currentPath.length > 0 ? currentPath[currentPath.length - 1].name : 'Files';
+    const currentFolderElement = document.getElementById('current-folder');
+    if (currentFolderElement) {
+        currentFolderElement.textContent = 
+            currentPath.length > 0 ? currentPath[currentPath.length - 1].name : 'Files';
+    }
 }
 
 // Navigate to folder
@@ -352,6 +353,8 @@ function handleDroppedFiles(files) {
     if (!files || files.length === 0) return;
     
     const uploadProgress = document.getElementById('upload-progress');
+    if (!uploadProgress) return;
+    
     uploadProgress.classList.remove('hidden');
     uploadProgress.innerHTML = '';
     
@@ -414,13 +417,18 @@ function simulateUploadProgress(file, progressItem) {
             }, 500);
         }
         
-        progressBar.style.width = `${progress}%`;
+        if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+        }
     }, 200);
 }
 
 // Create new folder
 function createNewFolder() {
-    const folderName = document.getElementById('new-folder-name').value.trim();
+    const folderNameInput = document.getElementById('new-folder-name');
+    if (!folderNameInput) return;
+    
+    const folderName = folderNameInput.value.trim();
     
     if (!folderName) {
         showToast('Please enter a folder name', 'error');
@@ -437,7 +445,7 @@ function createNewFolder() {
     renderFileList();
     renderFolderTree();
     hideModal('create-folder-modal');
-    document.getElementById('new-folder-name').value = '';
+    folderNameInput.value = '';
     showToast(`Folder "${folderName}" created`, 'success');
 }
 
@@ -455,14 +463,21 @@ function showRenameModal(type, id) {
     
     if (!currentName) return;
     
-    document.getElementById('rename-input').value = currentName;
+    const renameInput = document.getElementById('rename-input');
+    if (renameInput) {
+        renameInput.value = currentName;
+    }
+    
     selectedItem = { type, id, name: currentName };
     showModal('rename-modal');
 }
 
 // Rename item
 function renameItem() {
-    const newName = document.getElementById('rename-input').value.trim();
+    const renameInput = document.getElementById('rename-input');
+    if (!renameInput) return;
+    
+    const newName = renameInput.value.trim();
     
     if (!newName) {
         showToast('Please enter a name', 'error');
@@ -506,7 +521,11 @@ function showDeleteModal(type, id) {
     
     if (!itemName) return;
     
-    document.getElementById('delete-item-name').textContent = `"${itemName}"`;
+    const deleteItemName = document.getElementById('delete-item-name');
+    if (deleteItemName) {
+        deleteItemName.textContent = `"${itemName}"`;
+    }
+    
     selectedItem = { type, id, name: itemName };
     showModal('delete-modal');
 }
@@ -545,17 +564,27 @@ function downloadFile(fileId) {
 // Modal functions
 function showModal(modalId) {
     const modal = document.getElementById(modalId);
+    if (!modal) return;
+    
     modal.classList.remove('hidden');
     setTimeout(() => {
         modal.classList.remove('opacity-0');
-        modal.querySelector('div').classList.remove('scale-95');
+        const modalContent = modal.querySelector('div');
+        if (modalContent) {
+            modalContent.classList.remove('scale-95');
+        }
     }, 10);
 }
 
 function hideModal(modalId) {
     const modal = document.getElementById(modalId);
+    if (!modal) return;
+    
     modal.classList.add('opacity-0');
-    modal.querySelector('div').classList.add('scale-95');
+    const modalContent = modal.querySelector('div');
+    if (modalContent) {
+        modalContent.classList.add('scale-95');
+    }
     setTimeout(() => {
         modal.classList.add('hidden');
     }, 300);
