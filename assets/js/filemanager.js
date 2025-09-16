@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 1000);
 });
 
-// Initialize theme (same as in auth.js)
+// Initialize theme
 function initTheme() {
     const themeToggle = document.getElementById('theme-toggle');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -86,22 +86,20 @@ function setupEventListeners() {
     
     // Drag and drop
     const uploadArea = document.getElementById('upload-area');
-    if (uploadArea) {
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('drag-over');
-        });
-        
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('drag-over');
-        });
-        
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('drag-over');
-            handleDroppedFiles(e.dataTransfer.files);
-        });
-    }
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+    });
+    
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('drag-over');
+    });
+    
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        handleDroppedFiles(e.dataTransfer.files);
+    });
     
     // Create folder modal
     document.getElementById('create-folder-btn').addEventListener('click', () => {
@@ -127,9 +125,23 @@ function setupEventListeners() {
     });
     
     document.getElementById('confirm-delete').addEventListener('click', deleteItem);
+    
+    // New folder name input - allow Enter key to submit
+    document.getElementById('new-folder-name').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            createNewFolder();
+        }
+    });
+    
+    // Rename input - allow Enter key to submit
+    document.getElementById('rename-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            renameItem();
+        }
+    });
 }
 
-// Load file manager data using the improved apiFetch
+// Load file manager data
 async function loadFileManagerData() {
     try {
         const deviceFingerprint = getDeviceFingerprint();
@@ -177,7 +189,7 @@ function renderFileList() {
     // Render folders first
     currentFolders.forEach(folder => {
         const row = document.createElement('tr');
-        row.className = 'folder-item';
+        row.className = 'folder-item hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer';
         row.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
@@ -206,7 +218,7 @@ function renderFileList() {
     // Then render files
     currentFiles.forEach(file => {
         const row = document.createElement('tr');
-        row.className = 'file-item';
+        row.className = 'file-item hover:bg-gray-50 dark:hover:bg-gray-700';
         
         // Get file icon based on type
         let fileIcon = 'file';
@@ -214,6 +226,8 @@ function renderFileList() {
         else if (file.type && file.type.includes('pdf')) fileIcon = 'file-text';
         else if (file.type && file.type.includes('zip')) fileIcon = 'archive';
         else if (file.type && file.type.includes('text')) fileIcon = 'file-text';
+        else if (file.type && file.type.includes('video')) fileIcon = 'video';
+        else if (file.type && file.type.includes('audio')) fileIcon = 'music';
         
         row.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap">
@@ -273,19 +287,39 @@ function renderFolderTree() {
     // This would be implemented to show the full folder hierarchy
     // For simplicity, we're just showing a basic implementation
     folderTree.innerHTML = `
-        <div class="folder-item p-2 rounded cursor-pointer flex items-center" data-folder="root">
+        <div class="folder-item p-2 rounded cursor-pointer flex items-center hover:bg-gray-100 dark:hover:bg-gray-700" data-folder="root">
             <i data-lucide="folder" class="w-4 h-4 text-yellow-500 mr-2"></i>
             <span class="text-sm">Home</span>
         </div>
     `;
     
+    // Add current folders to the tree
+    currentFolders.forEach(folder => {
+        if (folder.parentId === 'root') {
+            const folderElement = document.createElement('div');
+            folderElement.className = 'folder-item p-2 rounded cursor-pointer flex items-center hover:bg-gray-100 dark:hover:bg-gray-700 ml-4';
+            folderElement.innerHTML = `
+                <i data-lucide="folder" class="w-4 h-4 text-yellow-500 mr-2"></i>
+                <span class="text-sm">${folder.name}</span>
+            `;
+            folderTree.appendChild(folderElement);
+            
+            folderElement.addEventListener('click', () => {
+                navigateToFolder(folder.id, folder.name);
+            });
+        }
+    });
+    
     // Add click event to navigate home
-    const homeElement = folderTree.querySelector('.folder-item');
+    const homeElement = folderTree.querySelector('[data-folder="root"]');
     if (homeElement) {
         homeElement.addEventListener('click', () => {
             navigateToFolder('root', 'Home');
         });
     }
+    
+    // Refresh icons
+    setTimeout(() => lucide.createIcons(), 100);
 }
 
 // Update breadcrumb
@@ -316,8 +350,8 @@ function updateBreadcrumb() {
             
             // Navigate to this folder when clicked
             pathItem.addEventListener('click', () => {
-                // This would navigate to the specific folder
-                // Simplified implementation
+                const newPath = currentPath.slice(0, index + 1);
+                navigateToPath(newPath);
             });
             
             breadcrumb.appendChild(pathItem);
@@ -334,15 +368,40 @@ function updateBreadcrumb() {
 
 // Navigate to folder
 function navigateToFolder(folderId, folderName) {
-    // This would update currentPath and reload files for that folder
-    // Simplified implementation for demo
-    showToast(`Navigated to ${folderName}`, 'info');
+    if (folderId === 'root') {
+        // Navigate to root
+        currentPath = [];
+        updateBreadcrumb();
+        // In a real implementation, we would filter files for root
+        renderFileList();
+        showToast(`Navigated to Home`, 'info');
+    } else {
+        // Navigate to specific folder
+        const folder = currentFolders.find(f => f.id === folderId);
+        if (folder) {
+            currentPath.push({ id: folderId, name: folderName });
+            updateBreadcrumb();
+            // In a real implementation, we would filter files for this folder
+            renderFileList();
+            showToast(`Navigated to ${folderName}`, 'info');
+        }
+    }
+}
+
+// Navigate to path
+function navigateToPath(path) {
+    currentPath = path;
+    updateBreadcrumb();
+    // In a real implementation, we would filter files for this path
+    renderFileList();
 }
 
 // Handle file upload
 function handleFileUpload(e) {
     const files = e.target.files;
     handleDroppedFiles(files);
+    // Reset the file input
+    e.target.value = '';
 }
 
 function handleDroppedFiles(files) {
@@ -361,7 +420,7 @@ function handleDroppedFiles(files) {
         }
         
         const progressItem = document.createElement('div');
-        progressItem.className = 'flex items-center';
+        progressItem.className = 'flex items-center mb-2';
         progressItem.innerHTML = `
             <div class="w-8 h-8 mr-3 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
                 <i data-lucide="file" class="w-4 h-4 text-gray-500"></i>
@@ -396,7 +455,9 @@ function simulateUploadProgress(file, progressItem) {
                     name: file.name,
                     size: file.size,
                     type: file.type,
-                    modified: new Date().toISOString()
+                    folderId: currentPath.length > 0 ? currentPath[currentPath.length - 1].id : 'root',
+                    modified: new Date().toISOString(),
+                    created: new Date().toISOString()
                 };
                 
                 currentFiles.push(newFile);
@@ -420,7 +481,7 @@ function simulateUploadProgress(file, progressItem) {
 }
 
 // Create new folder
-function createNewFolder() {
+async function createNewFolder() {
     const folderNameInput = document.getElementById('new-folder-name');
     if (!folderNameInput) return;
     
@@ -431,18 +492,36 @@ function createNewFolder() {
         return;
     }
     
-    const newFolder = {
-        id: Date.now().toString(),
-        name: folderName,
-        modified: new Date().toISOString()
-    };
-    
-    currentFolders.push(newFolder);
-    renderFileList();
-    renderFolderTree();
-    hideModal('create-folder-modal');
-    folderNameInput.value = '';
-    showToast(`Folder "${folderName}" created`, 'success');
+    try {
+        const deviceFingerprint = getDeviceFingerprint();
+        const currentFolderId = currentPath.length > 0 ? currentPath[currentPath.length - 1].id : 'root';
+        
+        const { success, error } = await apiFetch('/api/jsonbin', {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'addFolder',
+                data: { 
+                    name: folderName,
+                    path: currentPath.length > 0 ? `/${currentPath.map(p => p.name).join('/')}/${folderName}` : `/${folderName}`
+                },
+                folderId: currentFolderId,
+                deviceFingerprint
+            }),
+            csrfToken: 'write'
+        });
+        
+        if (success) {
+            showToast(`Folder "${folderName}" created`, 'success');
+            // Reload data
+            await loadFileManagerData();
+            hideModal('create-folder-modal');
+            folderNameInput.value = '';
+        } else {
+            showToast(error || 'Failed to create folder', 'error');
+        }
+    } catch (error) {
+        handleApiError(error, 'Failed to create folder');
+    }
 }
 
 // Show rename modal
@@ -462,6 +541,8 @@ function showRenameModal(type, id) {
     const renameInput = document.getElementById('rename-input');
     if (renameInput) {
         renameInput.value = currentName;
+        renameInput.focus();
+        renameInput.select();
     }
     
     selectedItem = { type, id, name: currentName };
@@ -469,7 +550,7 @@ function showRenameModal(type, id) {
 }
 
 // Rename item
-function renameItem() {
+async function renameItem() {
     const renameInput = document.getElementById('rename-input');
     if (!renameInput) return;
     
@@ -482,24 +563,33 @@ function renameItem() {
     
     if (!selectedItem) return;
     
-    if (selectedItem.type === 'file') {
-        const fileIndex = currentFiles.findIndex(f => f.id === selectedItem.id);
-        if (fileIndex !== -1) {
-            currentFiles[fileIndex].name = newName;
-            currentFiles[fileIndex].modified = new Date().toISOString();
+    try {
+        const deviceFingerprint = getDeviceFingerprint();
+        
+        const { success, error } = await apiFetch('/api/jsonbin', {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'renameItem',
+                itemType: selectedItem.type,
+                fileId: selectedItem.id,
+                newName: newName,
+                deviceFingerprint
+            }),
+            csrfToken: 'write'
+        });
+        
+        if (success) {
+            showToast(`Renamed to "${newName}"`, 'success');
+            // Reload data
+            await loadFileManagerData();
+            hideModal('rename-modal');
+        } else {
+            showToast(error || 'Failed to rename item', 'error');
         }
-    } else {
-        const folderIndex = currentFolders.findIndex(f => f.id === selectedItem.id);
-        if (folderIndex !== -1) {
-            currentFolders[folderIndex].name = newName;
-            currentFolders[folderIndex].modified = new Date().toISOString();
-        }
+    } catch (error) {
+        handleApiError(error, 'Failed to rename item');
     }
     
-    renderFileList();
-    if (selectedItem.type === 'folder') renderFolderTree();
-    hideModal('rename-modal');
-    showToast(`Renamed to "${newName}"`, 'success');
     selectedItem = null;
 }
 
@@ -527,34 +617,64 @@ function showDeleteModal(type, id) {
 }
 
 // Delete item
-function deleteItem() {
+async function deleteItem() {
     if (!selectedItem) return;
     
-    if (selectedItem.type === 'file') {
-        currentFiles = currentFiles.filter(f => f.id !== selectedItem.id);
-    } else {
-        currentFolders = currentFolders.filter(f => f.id !== selectedItem.id);
+    try {
+        const deviceFingerprint = getDeviceFingerprint();
+        
+        const { success, error } = await apiFetch('/api/jsonbin', {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'deleteItem',
+                itemType: selectedItem.type,
+                fileId: selectedItem.id,
+                deviceFingerprint
+            }),
+            csrfToken: 'delete'
+        });
+        
+        if (success) {
+            showToast(`Deleted "${selectedItem.name}"`, 'success');
+            // Reload data
+            await loadFileManagerData();
+            hideModal('delete-modal');
+        } else {
+            showToast(error || 'Failed to delete item', 'error');
+        }
+    } catch (error) {
+        handleApiError(error, 'Failed to delete item');
     }
     
-    renderFileList();
-    if (selectedItem.type === 'folder') renderFolderTree();
-    hideModal('delete-modal');
-    showToast(`Deleted "${selectedItem.name}"`, 'success');
     selectedItem = null;
 }
 
 // Download file
-function downloadFile(fileId) {
+async function downloadFile(fileId) {
     const file = currentFiles.find(f => f.id === fileId);
     if (!file) return;
     
-    // In a real implementation, this would fetch the actual file data
-    showToast(`Downloading "${file.name}"`, 'info');
-    
-    // Simulate download
-    setTimeout(() => {
-        showToast(`Downloaded "${file.name}"`, 'success');
-    }, 1500);
+    try {
+        showToast(`Downloading "${file.name}"`, 'info');
+        
+        // In a real implementation, this would fetch the actual file content from server
+        // For demo, we'll create a dummy download
+        const blob = new Blob([`Content of ${file.name} (simulated download)`], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        setTimeout(() => {
+            showToast(`Downloaded "${file.name}"`, 'success');
+        }, 1000);
+    } catch (error) {
+        showToast(`Failed to download "${file.name}"`, 'error');
+    }
 }
 
 // Modal functions
