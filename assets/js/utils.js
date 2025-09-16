@@ -41,14 +41,15 @@ function getToastIcon(type) {
 
 // Get device fingerprint
 export function getDeviceFingerprint() {
-    const screen = `${screen.width}x${screen.height}`;
+    // Check if screen object is available (for SSR compatibility)
+    const screenInfo = typeof screen !== 'undefined' ? `${screen.width}x${screen.height}` : 'unknown';
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const language = navigator.language;
     const platform = navigator.platform;
     
     return {
         userAgent: navigator.userAgent,
-        screen,
+        screen: screenInfo,
         timezone,
         language,
         platform,
@@ -71,4 +72,47 @@ export function formatFileSize(bytes) {
 export function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// Generate a simple CSRF token
+export function generateCSRFToken() {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
+// Check if user is logged in
+export async function checkAuth() {
+    try {
+        const response = await fetch('/api/auth', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': 'verify'
+            },
+            body: JSON.stringify({
+                action: 'verify'
+            })
+        });
+        
+        return response.ok;
+    } catch (error) {
+        console.error('Auth check error:', error);
+        return false;
+    }
+}
+
+// Handle API errors
+export function handleApiError(error, defaultMessage = 'An error occurred') {
+    console.error('API Error:', error);
+    
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        showToast('Network error. Please check your connection.', 'error');
+    } else if (error.response && error.response.status === 401) {
+        showToast('Session expired. Please login again.', 'error');
+        // Redirect to login after a delay
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 2000);
+    } else {
+        showToast(defaultMessage, 'error');
+    }
 }
