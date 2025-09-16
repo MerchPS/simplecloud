@@ -3,6 +3,8 @@
 // Show toast notification
 export function showToast(message, type = 'info') {
     const toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) return;
+    
     const toast = document.createElement('div');
     toast.className = `toast ${type} px-4 py-3 rounded-lg shadow-lg flex items-center justify-between max-w-md`;
     
@@ -93,7 +95,15 @@ export async function checkAuth() {
             })
         });
         
-        return response.ok;
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            return response.ok;
+        } else {
+            // If not JSON, it's likely an error
+            return false;
+        }
     } catch (error) {
         console.error('Auth check error:', error);
         return false;
@@ -114,5 +124,40 @@ export function handleApiError(error, defaultMessage = 'An error occurred') {
         }, 2000);
     } else {
         showToast(defaultMessage, 'error');
+    }
+}
+
+// Improved fetch with better error handling
+export async function apiFetch(url, options = {}) {
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': options.csrfToken || 'default',
+                ...options.headers
+            },
+            ...options
+        });
+        
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        let data;
+        
+        if (contentType && contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            // If not JSON, get the text response
+            const text = await response.text();
+            throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}...`);
+        }
+        
+        if (!response.ok) {
+            throw new Error(data.error || `Server error: ${response.status}`);
+        }
+        
+        return { success: true, data };
+    } catch (error) {
+        console.error('API fetch error:', error);
+        return { success: false, error: error.message };
     }
 }
