@@ -67,61 +67,6 @@ if (loginForm) {
     });
 }
 
-// Simulate API response for demo purposes
-function simulateApiResponse(action, storageId, password) {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            // Simulate successful response
-            if (action === 'create') {
-                // Store user data in localStorage for demo
-                const users = JSON.parse(localStorage.getItem('cloudstorage_users') || '{}');
-                if (users[storageId]) {
-                    resolve({ 
-                        success: false, 
-                        error: 'Storage ID already exists' 
-                    });
-                } else {
-                    users[storageId] = {
-                        password: btoa(password), // Not secure, just for demo
-                        createdAt: new Date().toISOString(),
-                        storage: {
-                            files: [],
-                            folders: [
-                                {
-                                    id: 'root',
-                                    name: 'Home',
-                                    path: '/',
-                                    children: []
-                                }
-                            ]
-                        }
-                    };
-                    localStorage.setItem('cloudstorage_users', JSON.stringify(users));
-                    
-                    resolve({ 
-                        success: true, 
-                        message: 'Storage created successfully' 
-                    });
-                }
-            } else if (action === 'login') {
-                // Check user data from localStorage for demo
-                const users = JSON.parse(localStorage.getItem('cloudstorage_users') || '{}');
-                if (!users[storageId] || users[storageId].password !== btoa(password)) {
-                    resolve({ 
-                        success: false, 
-                        error: 'Invalid storage ID or password' 
-                    });
-                } else {
-                    resolve({ 
-                        success: true, 
-                        message: 'Login successful' 
-                    });
-                }
-            }
-        }, 1000); // Simulate network delay
-    });
-}
-
 async function handleCreateStorage() {
     const storageIdInput = document.getElementById('create-id');
     const passwordInput = document.getElementById('create-password');
@@ -139,7 +84,6 @@ async function handleCreateStorage() {
     try {
         const deviceFingerprint = getDeviceFingerprint();
         
-        // Try to call the real API first
         const { success, data, error } = await apiFetch('/api/auth', {
             method: 'POST',
             body: JSON.stringify({
@@ -156,30 +100,10 @@ async function handleCreateStorage() {
             // Auto login after creation
             setTimeout(() => handleLoginAfterCreate(storageId, password), 1500);
         } else {
-            // If API fails, use the fallback simulation
-            console.log('API failed, using fallback:', error);
-            const result = await simulateApiResponse('create', storageId, password);
-            
-            if (result.success) {
-                showToast('Storage created successfully! (Demo Mode)', 'success');
-                // Auto login after creation
-                setTimeout(() => handleLoginAfterCreate(storageId, password), 1500);
-            } else {
-                showToast(result.error || 'Failed to create storage', 'error');
-            }
+            showToast(error || 'Failed to create storage', 'error');
         }
     } catch (error) {
-        // If fetch completely fails, use the fallback simulation
-        console.log('Fetch failed, using fallback:', error);
-        const result = await simulateApiResponse('create', storageId, password);
-        
-        if (result.success) {
-            showToast('Storage created successfully! (Demo Mode)', 'success');
-            // Auto login after creation
-            setTimeout(() => handleLoginAfterCreate(storageId, password), 1500);
-        } else {
-            showToast(result.error || 'Failed to create storage', 'error');
-        }
+        handleApiError(error, 'Failed to create storage');
     }
 }
 
@@ -204,7 +128,6 @@ async function handleLoginAfterCreate(storageId, password) {
     try {
         const deviceFingerprint = getDeviceFingerprint();
         
-        // Try to call the real API first
         const { success, data, error } = await apiFetch('/api/auth', {
             method: 'POST',
             body: JSON.stringify({
@@ -218,44 +141,14 @@ async function handleLoginAfterCreate(storageId, password) {
         
         if (success) {
             showToast('Login successful!', 'success');
-            // Store login state in localStorage for demo
-            localStorage.setItem('cloudstorage_current_user', storageId);
             // Redirect to dashboard after a brief delay
             setTimeout(() => {
                 window.location.href = '/dashboard.html';
             }, 1000);
         } else {
-            // If API fails, use the fallback simulation
-            console.log('API failed, using fallback:', error);
-            const result = await simulateApiResponse('login', storageId, password);
-            
-            if (result.success) {
-                showToast('Login successful! (Demo Mode)', 'success');
-                // Store login state in localStorage for demo
-                localStorage.setItem('cloudstorage_current_user', storageId);
-                // Redirect to dashboard after a brief delay
-                setTimeout(() => {
-                    window.location.href = '/dashboard.html';
-                }, 1000);
-            } else {
-                showToast(result.error || 'Login failed', 'error');
-            }
+            showToast(error || 'Login failed', 'error');
         }
     } catch (error) {
-        // If fetch completely fails, use the fallback simulation
-        console.log('Fetch failed, using fallback:', error);
-        const result = await simulateApiResponse('login', storageId, password);
-        
-        if (result.success) {
-            showToast('Login successful! (Demo Mode)', 'success');
-            // Store login state in localStorage for demo
-            localStorage.setItem('cloudstorage_current_user', storageId);
-            // Redirect to dashboard after a brief delay
-            setTimeout(() => {
-                window.location.href = '/dashboard.html';
-            }, 1000);
-        } else {
-            showToast(result.error || 'Login failed', 'error');
-        }
+        handleApiError(error, 'Login failed');
     }
 }
