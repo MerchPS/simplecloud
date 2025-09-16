@@ -1,0 +1,134 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+* {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out forwards;
+}
+
+.pulse:hover {
+    animation: pulse 0.5s;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+/* File tree styling */
+.folder-item, .file-item {
+    transition: all 0.2s ease;
+}
+
+.folder-item:hover, .file-item:hover {
+    background-color: #f1f5f9;
+}
+
+.dark .folder-item:hover, .dark .file-item:hover {
+    background-color: #374151;
+}
+
+/* Drag and drop area */
+.drag-over {
+    border-color: #6366f1 !important;
+    background-color: #eef2ff !important;
+}
+
+.dark .drag-over {
+    border-color: #818cf8 !important;
+    background-color: #312e81 !important;
+}
+
+/* Toast notifications */
+.toast {
+    animation: slideIn 0.3s ease-out forwards;
+}
+
+.toast.success {
+    background-color: #10b981;
+    color: white;
+}
+
+.toast.error {
+    background-color: #ef4444;
+    color: white;
+}
+
+.toast.info {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.toast.warning {
+    background-color: #f59e0b;
+    color: white;
+}
+
+/* Progress bar */
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+/* Breadcrumb styling */
+.breadcrumb-item:not(:last-child):after {
+    content: "/";
+    margin: 0 0.5rem;
+    color: #9ca3af;
+}
+
+/* Loading spinner */
+.spinner {
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #6366f1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

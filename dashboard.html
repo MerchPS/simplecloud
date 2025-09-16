@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Manager - CloudStorage Enchanted++</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen">
+    <div id="loading-screen" class="fixed inset-0 bg-white dark:bg-gray-900 flex items-center justify-center z-50 transition-opacity duration-500">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+            <p class="mt-4 text-lg font-semibold text-gray-700 dark:text-gray-300">Loading your storage…</p>
+        </div>
+    </div>
+
+    <div class="flex flex-col h-screen opacity-0 transition-opacity duration-500" id="app-container">
+        <!-- Header -->
+        <header class="bg-white dark:bg-gray-800 shadow-sm">
+            <div class="flex items-center justify-between p-4">
+                <div class="flex items-center">
+                    <button id="sidebar-toggle" class="md:hidden mr-2 text-gray-600 dark:text-gray-300">
+                        <i data-lucide="menu"></i>
+                    </button>
+                    <h1 class="text-xl font-semibold text-indigo-600 dark:text-indigo-400">CloudStorage Enchanted++</h1>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                        <i data-lucide="moon" class="hidden dark:block"></i>
+                        <i data-lucide="sun" class="block dark:hidden"></i>
+                    </button>
+                    <button id="logout-btn" class="flex items-center text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                        <i data-lucide="log-out" class="w-4 h-4 mr-1"></i>
+                        Logout
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Breadcrumb -->
+            <div class="px-4 pb-4 flex items-center text-sm text-gray-600 dark:text-gray-400" id="breadcrumb">
+                <span class="cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-300">Home</span>
+            </div>
+        </header>
+
+        <div class="flex flex-1 overflow-hidden">
+            <!-- Sidebar - Folder Tree -->
+            <aside class="bg-white dark:bg-gray-800 shadow-md w-64 transform -translate-x-full md:translate-x-0 transition-transform duration-300 fixed md:relative h-full z-40" id="sidebar">
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <h2 class="font-medium text-gray-700 dark:text-gray-300">Folders</h2>
+                    <button id="create-folder-btn" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">
+                        <i data-lucide="folder-plus" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div class="p-4 overflow-y-auto h-full" id="folder-tree">
+                    <!-- Folder tree will be populated here -->
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 overflow-auto bg-white dark:bg-gray-800 p-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-medium text-gray-700 dark:text-gray-300" id="current-folder">Files</h2>
+                    <div class="flex space-x-2">
+                        <button id="upload-file-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm flex items-center">
+                            <i data-lucide="upload" class="w-4 h-4 mr-1"></i>
+                            Upload
+                        </button>
+                        <input type="file" id="file-input" multiple class="hidden">
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4 hidden" id="upload-area">
+                    <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
+                        <i data-lucide="upload-cloud" class="w-12 h-12 text-gray-400 mx-auto mb-2"></i>
+                        <p class="text-gray-500 dark:text-gray-400 mb-2">Drag files here or click to browse</p>
+                        <button class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm">
+                            Select Files
+                        </button>
+                    </div>
+                    <div class="mt-4 space-y-2 hidden" id="upload-progress"></div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Size</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Modified</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700" id="file-list">
+                            <!-- Files will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 text-center text-gray-500 dark:text-gray-400 hidden" id="empty-state">
+                    <i data-lucide="folder-open" class="w-12 h-12 mx-auto mb-2"></i>
+                    <p>This folder is empty</p>
+                </div>
+            </main>
+        </div>
+
+        <!-- Modals -->
+        <div id="create-folder-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 transform scale-95 transition-transform duration-300">
+                <h3 class="text-lg font-medium text-gray-800 dark:text-gray-200 mb-4">Create New Folder</h3>
+                <input type="text" id="new-folder-name" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 mb-4" placeholder="Folder name">
+                <div class="flex justify-end space-x-2">
+                    <button class="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 rounded-lg" id="cancel-create-folder">Cancel</button>
+                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700" id="confirm-create-folder">Create</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="rename-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 transform scale-95 transition-transform duration-300">
+                <h3 class="text-lg font-medium text-gray-800 dark:text-gray-200 mb-4">Rename</h3>
+                <input type="text" id="rename-input" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 mb-4">
+                <div class="flex justify-end space-x-2">
+                    <button class="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 rounded-lg" id="cancel-rename">Cancel</button>
+                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700" id="confirm-rename">Rename</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 transform scale-95 transition-transform duration-300">
+                <h3 class="text-lg font-medium text-gray-800 dark:text-gray-200 mb-4">Confirm Delete</h3>
+                <p class="text-gray-600 dark:text-gray-300 mb-4">Are you sure you want to delete <span id="delete-item-name" class="font-medium"></span>? This action cannot be undone.</p>
+                <div class="flex justify-end space-x-2">
+                    <button class="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 rounded-lg" id="cancel-delete">Cancel</button>
+                    <button class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700" id="confirm-delete">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    </div>
+
+    <script type="module" src="/assets/js/filemanager.js"></script>
+</body>
+</html>

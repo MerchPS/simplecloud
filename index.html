@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudStorage Enchanted++</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-900 min-h-screen flex items-center justify-center p-4">
+    <div id="loading-screen" class="fixed inset-0 bg-white dark:bg-gray-900 flex items-center justify-center z-50 transition-opacity duration-500">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+            <p class="mt-4 text-lg font-semibold text-gray-700 dark:text-gray-300">CloudStorage Enchanted++ Loading…</p>
+        </div>
+    </div>
+
+    <div class="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden transition-all duration-300 transform scale-95 opacity-0" id="main-container">
+        <div class="p-8">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">CloudStorage Enchanted++</h1>
+                <p class="text-gray-600 dark:text-gray-300">Your magical file storage solution</p>
+            </div>
+
+            <div class="flex justify-center mb-6">
+                <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    <i data-lucide="moon" class="hidden dark:block"></i>
+                    <i data-lucide="sun" class="block dark:hidden"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-xl">
+                    <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Create New Storage</h2>
+                    <form id="create-form">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2" for="create-id">
+                                Storage ID
+                            </label>
+                            <input class="bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg py-2 px-4 w-full border border-gray-300 dark:border-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                                id="create-id" type="text" required placeholder="Enter unique ID">
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2" for="create-password">
+                                Password
+                            </label>
+                            <input class="bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg py-2 px-4 w-full border border-gray-300 dark:border-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                                id="create-password" type="password" required placeholder="Create a password">
+                        </div>
+                        <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition duration-300 transform hover:scale-[1.02]" type="submit">
+                            Create Storage
+                        </button>
+                    </form>
+                </div>
+
+                <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-xl">
+                    <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Access Existing Storage</h2>
+                    <form id="login-form">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2" for="login-id">
+                                Storage ID
+                            </label>
+                            <input class="bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg py-2 px-4 w-full border border-gray-300 dark:border-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                                id="login-id" type="text" required placeholder="Enter your ID">
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2" for="login-password">
+                                Password
+                            </label>
+                            <input class="bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg py-2 px-4 w-full border border-gray-300 dark:border-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                                id="login-password" type="password" required placeholder="Enter your password">
+                        </div>
+                        <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition duration-300 transform hover:scale-[1.02]" type="submit">
+                            Login to Storage
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    </div>
+
+    <script type="module" src="/assets/js/auth.js"></script>
+</body>
+</html>
