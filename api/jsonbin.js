@@ -1,8 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-// In a real implementation, you would integrate with JSONBin.io
-// For demo purposes, we'll use a simple in-memory store
-const storageData = new Map();
+// In-memory store untuk rate limiting
 const rateLimitMap = new Map();
 
 export default async function handler(req, res) {
@@ -51,22 +49,11 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: 'Too many requests. Please try again later.' });
     }
 
-    // Get or initialize user storage
-    if (!storageData.has(storageId)) {
-      storageData.set(storageId, {
-        files: [],
-        folders: [
-          {
-            id: 'root',
-            name: 'Home',
-            path: '/',
-            children: []
-          }
-        ]
-      });
+    // Get user storage from JSONBin
+    const userStorage = await getStorageFromJSONBin(storageId);
+    if (!userStorage) {
+      return res.status(404).json({ error: 'Storage not found' });
     }
-
-    const userStorage = storageData.get(storageId);
 
     if (action === 'getStorage') {
       // Get user's storage data
@@ -79,7 +66,11 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Data is required' });
       }
 
-      storageData.set(storageId, data);
+      const saveSuccess = await saveStorageToJSONBin(storageId, data);
+      if (!saveSuccess) {
+        return res.status(500).json({ error: 'Failed to update storage' });
+      }
+
       return res.status(200).json({ message: 'Storage updated successfully' });
     }
 
@@ -100,7 +91,11 @@ export default async function handler(req, res) {
         created: new Date().toISOString()
       });
 
-      storageData.set(storageId, userStorage);
+      const saveSuccess = await saveStorageToJSONBin(storageId, userStorage);
+      if (!saveSuccess) {
+        return res.status(500).json({ error: 'Failed to add file' });
+      }
+
       return res.status(200).json({ message: 'File added successfully' });
     }
 
@@ -121,7 +116,11 @@ export default async function handler(req, res) {
       };
 
       userStorage.folders.push(newFolder);
-      storageData.set(storageId, userStorage);
+      const saveSuccess = await saveStorageToJSONBin(storageId, userStorage);
+      if (!saveSuccess) {
+        return res.status(500).json({ error: 'Failed to add folder' });
+      }
+
       return res.status(200).json({ message: 'Folder added successfully', folder: newFolder });
     }
 
@@ -149,7 +148,11 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid item type' });
       }
 
-      storageData.set(storageId, userStorage);
+      const saveSuccess = await saveStorageToJSONBin(storageId, userStorage);
+      if (!saveSuccess) {
+        return res.status(500).json({ error: 'Failed to rename item' });
+      }
+
       return res.status(200).json({ message: 'Item renamed successfully' });
     }
 
@@ -169,7 +172,11 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid item type' });
       }
 
-      storageData.set(storageId, userStorage);
+      const saveSuccess = await saveStorageToJSONBin(storageId, userStorage);
+      if (!saveSuccess) {
+        return res.status(500).json({ error: 'Failed to delete item' });
+      }
+
       return res.status(200).json({ message: 'Item deleted successfully' });
     }
 
@@ -177,6 +184,51 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('JSONBin API error:', error);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+// Function to get storage data from JSONBin
+async function getStorageFromJSONBin(storageId) {
+  try {
+    const response = await fetch(`https://api.jsonbin.io/v3/b/${storageId}`, {
+      method: 'GET',
+      headers: {
+        'X-Master-Key': process.env.JSONBIN_KEY,
+        'X-Bin-Meta': false
+      }
+    });
+
+    if (response.status === 404) {
+      return null; // Storage not found
+    }
+
+    if (!response.ok) {
+      throw new Error(`JSONBin error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting storage from JSONBin:', error);
+    return null;
+  }
+}
+
+// Function to save storage data to JSONBin
+async function saveStorageToJSONBin(storageId, data) {
+  try {
+    const response = await fetch(`https://api.jsonbin.io/v3/b/${storageId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': process.env.JSONBIN_KEY
+      },
+      body: JSON.stringify(data)
+    });
+
+    return response.ok;
+  } catch (error) {
+    console.error('Error saving storage to JSONBin:', error);
+    return false;
   }
 }
 
