@@ -13,7 +13,7 @@ export function showToast(message, type = 'info') {
     }
     
     const toast = document.createElement('div');
-    toast.className = `toast ${type} px-4 py-3 rounded-lg shadow-lg flex items-center justify-between max-w-md`;
+    toast.className = `toast ${type} px-4 py-3 rounded-lg shadow-lg flex items-center justify-between max-w-md transition-all duration-300`;
     
     toast.innerHTML = `
         <div class="flex items-center">
@@ -34,14 +34,22 @@ export function showToast(message, type = 'info') {
     
     // Auto remove after 5 seconds
     setTimeout(() => {
-        toast.remove();
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
     }, 5000);
     
     // Allow manual dismiss
     const button = toast.querySelector('button');
     if (button) {
         button.addEventListener('click', () => {
-            toast.remove();
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
         });
     }
 }
@@ -101,15 +109,8 @@ export function generateCSRFToken() {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
-// Check if user is logged in (demo version)
+// Check if user is logged in
 export async function checkAuth() {
-    // For demo purposes, check localStorage
-    const currentUser = localStorage.getItem('cloudstorage_current_user');
-    if (currentUser) {
-        return true;
-    }
-    
-    // Try to check with real API
     try {
         const response = await fetch('/api/auth', {
             method: 'POST',
@@ -150,7 +151,9 @@ export function handleApiError(error, defaultMessage = 'An error occurred') {
             window.location.href = '/';
         }, 2000);
     } else if (error.message && error.message.includes('404')) {
-        showToast('Server temporarily unavailable. Using demo mode.', 'warning');
+        showToast('Server temporarily unavailable. Please try again later.', 'error');
+    } else if (error.message && error.message.includes('500')) {
+        showToast('Server error. Please try again later.', 'error');
     } else {
         showToast(defaultMessage, 'error');
     }
@@ -177,6 +180,12 @@ export async function apiFetch(url, options = {}) {
         } else {
             // If not JSON, get the text response
             const text = await response.text();
+            
+            // If it's an HTML page (like a 404 error page), throw a specific error
+            if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+                throw new Error(`Server returned HTML instead of JSON: ${response.status} ${response.statusText}`);
+            }
+            
             throw new Error(`Server returned non-JSON response: ${response.status} ${response.statusText}`);
         }
         
@@ -191,35 +200,110 @@ export async function apiFetch(url, options = {}) {
     }
 }
 
-// Demo mode data functions
-export function getDemoStorage() {
-    const currentUser = localStorage.getItem('cloudstorage_current_user');
-    if (!currentUser) return null;
-    
-    const users = JSON.parse(localStorage.getItem('cloudstorage_users') || '{}');
-    return users[currentUser] ? users[currentUser].storage : {
-        files: [],
-        folders: [
-            {
-                id: 'root',
-                name: 'Home',
-                path: '/',
-                children: []
-            }
-        ]
+// Debounce function for search inputs
+export function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
     };
 }
 
-export function saveDemoStorage(storageData) {
-    const currentUser = localStorage.getItem('cloudstorage_current_user');
-    if (!currentUser) return false;
+// Format time ago
+export function timeAgo(dateString) {
+    if (!dateString) return 'Unknown';
     
-    const users = JSON.parse(localStorage.getItem('cloudstorage_users') || '{}');
-    if (users[currentUser]) {
-        users[currentUser].storage = storageData;
-        localStorage.setItem('cloudstorage_users', JSON.stringify(users));
-        return true;
+    try {
+        const date = new Date(dateString);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+        
+        if (seconds < 60) return 'just now';
+        
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+        
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+        
+        const days = Math.floor(hours / 24);
+        if (days < 30) return `${days} day${days !== 1 ? 's' : ''} ago`;
+        
+        const months = Math.floor(days / 30);
+        if (months < 12) return `${months} month${months !== 1 ? 's' : ''} ago`;
+        
+        const years = Math.floor(months / 12);
+        return `${years} year${years !== 1 ? 's' : ''} ago`;
+    } catch (e) {
+        return 'Invalid date';
     }
+}
+
+// Validate file name
+export function isValidFileName(name) {
+    if (!name || name.length === 0) return false;
     
-    return false;
+    // Check for invalid characters
+    const invalidChars = /[<>:"/\\|?*\x00-\x1F]/;
+    if (invalidChars.test(name)) return false;
+    
+    // Check for reserved names
+    const reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
+    if (reservedNames.includes(name.toUpperCase())) return false;
+    
+    // Check for trailing periods or spaces
+    if (name.trim() !== name) return false;
+    if (name.endsWith('.') || name.endsWith(' ')) return false;
+    
+    return true;
+}
+
+// Get file icon based on extension
+export function getFileIcon(filename) {
+    if (!filename) return 'file';
+    
+    const extension = filename.split('.').pop().toLowerCase();
+    
+    const iconMap = {
+        // Images
+        'jpg': 'image', 'jpeg': 'image', 'png': 'image', 'gif': 'image', 
+        'bmp': 'image', 'svg': 'image', 'webp': 'image', 'ico': 'image',
+        
+        // Documents
+        'pdf': 'file-text', 'doc': 'file-text', 'docx': 'file-text', 
+        'txt': 'file-text', 'rtf': 'file-text', 'md': 'file-text',
+        
+        // Spreadsheets
+        'xls': 'file-spreadsheet', 'xlsx': 'file-spreadsheet', 'csv': 'file-spreadsheet',
+        
+        // Presentations
+        'ppt': 'presentation', 'pptx': 'presentation',
+        
+        // Archives
+        'zip': 'archive', 'rar': 'archive', '7z': 'archive', 'tar': 'archive', 
+        'gz': 'archive', 'bz2': 'archive',
+        
+        // Code
+        'js': 'file-js', 'jsx': 'file-js', 'ts': 'file-js', 'tsx': 'file-js',
+        'html': 'file-html', 'htm': 'file-html', 'css': 'file-css', 'scss': 'file-css',
+        'php': 'file-php', 'py': 'file-py', 'java': 'file-code', 'c': 'file-code',
+        'cpp': 'file-code', 'cs': 'file-code', 'go': 'file-code', 'rb': 'file-code',
+        'json': 'file-json', 'xml': 'file-code',
+        
+        // Audio
+        'mp3': 'music', 'wav': 'music', 'ogg': 'music', 'flac': 'music',
+        
+        // Video
+        'mp4': 'video', 'avi': 'video', 'mov': 'video', 'wmv': 'video',
+        'flv': 'video', 'webm': 'video', 'mkv': 'video',
+        
+        // Other
+        'exe': 'cpu', 'msi': 'cpu', 'dll': 'settings'
+    };
+    
+    return iconMap[extension] || 'file';
 }
